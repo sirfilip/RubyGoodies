@@ -14,8 +14,8 @@ class RedisPool
 
         catch(:exit) do 
           loop do 
-            block = @jobs.pop
-            block.call(redis)
+            job = @jobs.pop
+            job.call(redis)
           end
         end
       end
