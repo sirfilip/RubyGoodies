@@ -8,3 +8,4 @@ end
 session = Capybara::Session.new(:selenium_chrome)
 session.visit('https://google.com')
 session.find('input[title=Search]').set("Capybara Rocks")
+session.driver.quit
