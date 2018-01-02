@@ -2,9 +2,15 @@ require 'minitest/autorun'
 
 class XmlBuilder
   def initialize
+    @render_xml_tag = false
     @namespaces = {}
     @content = ''
     @prefix = ''
+  end
+
+  def render_xml_tag!
+    @render_xml_tag = true
+    self
   end
 
   def register_namespace(namespaces)
@@ -26,10 +32,15 @@ class XmlBuilder
     @content << open_tag(tagname, attrs)
     yield self if block_given?
     @content << close_tag(tagname)
+    self
   end
 
   def to_s
-    @content
+    if @render_xml_tag 
+      "<?xml version=\"1.0\" encoding=\"utf-8\"?>#{@content}"
+    else
+      @content
+    end
   end
 
   private
@@ -81,5 +92,13 @@ describe XmlBuilder do
         builder.namespace(:x).foo(:bar => "333")
       end
     end.to_s.must_equal '<root xmlns:x="html5" foo="123"><f:bar foo="567"><x:foo bar="333"></x:foo></f:bar></root>'
+  end
+
+  it 'can render xml tag' do
+    XmlBuilder.new.render_xml_tag!.register_namespace(:x => "html5").root(:foo => "123") do |builder| 
+      builder.namespace(:f).bar(:foo => "567") do |builder|
+        builder.namespace(:x).foo(:bar => "333")
+      end
+    end.to_s.must_equal '<?xml version="1.0" encoding="utf-8"?><root xmlns:x="html5" foo="123"><f:bar foo="567"><x:foo bar="333"></x:foo></f:bar></root>'
   end
 end
