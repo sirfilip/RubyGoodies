@@ -41,6 +41,10 @@ def pwd
   Dir.pwd
 end
 
+def cat(filename)
+  puts File.read(filename)
+end
+
 # benchmark 
 def time
   start = Time.now
