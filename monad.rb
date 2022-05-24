@@ -38,6 +38,12 @@ module Monad
       end
     end
 
+    def else(&block)
+      if error
+        block.call(error)
+      end
+    end
+
     def to_s
       if error 
         "Failure(#{error})"
@@ -112,6 +118,18 @@ if __FILE__ == $0
       end
       assert_equal r.error, 'error'
       assert_nil r.value
+    end
+
+    it 'provides else' do
+      r = Ok(1).then do |val|
+        Failure('error')
+      end.then do |val|
+        Ok(val + 1)
+      end.else do |err|
+        assert_equal err, 'error'
+        return
+      end
+      fail
     end
 
     it 'returns the correct result' do
