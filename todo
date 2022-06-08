@@ -54,7 +54,7 @@ class Printer
   end
 
   def print_task(task)
-    @out.puts("|#{task.completed? ? 'COMPLETED' : 'PENDING'} | #{task.id} | #{task.to_s.ljust(longest_task_length)} | #{task.at}|")
+    @out.puts("|#{task.completed? ? 'DONE'.ljust(7) : 'PENDING'} | #{task.id} | #{task.to_s.ljust(longest_task_length)} | #{task.at}|")
   end
 
   def longest_task_length
@@ -77,22 +77,12 @@ class TaskManager
   end
 
   def complete_task(task_id)
-    task_id = task_id.to_i
-    task = @tasks[task_id]
-    task.complete!
-    @tasks[task_id] = task
+    @tasks[task_id].complete!
     store_tasks
   end
 
   def delete_task(task_id)
-    task_id = task_id.to_i
-    tasks = {}
-    @tasks.each do |_, task|
-      next if task_id == task.id
-
-      tasks[task.id] = task
-    end
-    @tasks = tasks
+    @tasks.delete(task_id)
     store_tasks
   end
 
@@ -101,13 +91,7 @@ class TaskManager
   end
 
   def print_pending_tasks
-    tasks = {}
-    @tasks.each do |task_id, task|
-      next if task.completed?
-
-      tasks[task_id] = task
-    end
-    @printer.print(tasks)
+    @printer.print(@tasks.reject{|_, task| task.completed? })
   end
 
   def cleanup
@@ -146,13 +130,13 @@ end
 OptionParser.new do |opts|
   opts.banner = 'Usage: todo [options] [task]'
 
-  opts.on('-c', '--complete TASK_ID', 'Complete task') do |task_id|
+  opts.on('-c', '--complete TASK_ID', Integer, 'Complete task') do |task_id|
     puts "Marking as completed task: #{task_id}"
     @task_manager.complete_task(task_id)
     exit
   end
 
-  opts.on('-d', '--delete TASK_ID', 'Delete task') do |task_id|
+  opts.on('-d', '--delete TASK_ID', Integer, 'Delete task') do |task_id|
     puts "Deleting task: #{task_id}"
     @task_manager.delete_task(task_id)
     exit
