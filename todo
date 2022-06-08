@@ -1,0 +1,178 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require 'optparse'
+require 'json'
+
+class Task
+  attr_reader :id, :at
+
+  def initialize(id:, task:, completed:)
+    @id = id
+    @task = task
+    @completed = completed
+    @at = Time.at(id)
+  end
+
+  def completed?
+    @completed
+  end
+
+  def complete!
+    @completed = true
+    @at = Time.now
+  end
+
+  def to_s
+    @task
+  end
+end
+
+class Printer
+  def initialize(out)
+    @out = out
+    @tasks = []
+  end
+
+  def print(tasks)
+    @tasks = tasks
+    print_banner
+    @tasks.each do |_, task|
+      print_task(task)
+    end
+  end
+
+  private
+
+  def print_banner
+    if @tasks.empty?
+      @out.puts 'No Tasks Here'
+      return
+    end
+    @out.puts 'Tasks'
+  end
+
+  def print_task(task)
+    @out.puts("|#{task.completed? ? 'COMPLETED' : 'PENDING'} | #{task.id} | #{task.to_s.ljust(longest_task_length)} | #{task.at}|")
+  end
+
+  def longest_task_length
+    @longest_task_length ||= @tasks.values.sort { |a, b| a.to_s <=> b.to_s }.last.to_s.length
+  end
+end
+
+class TaskManager
+  STORAGE = ::File.join(ENV['HOME'], '.todos')
+
+  def initialize(printer)
+    @printer = printer
+    load_tasks
+  end
+
+  def add_task(task)
+    id = Time.now.to_i
+    @tasks[id] = Task.new(id: id, task: task, completed: false)
+    store_tasks
+  end
+
+  def complete_task(task_id)
+    task_id = task_id.to_i
+    task = @tasks[task_id]
+    task.complete!
+    @tasks[task_id] = task
+    store_tasks
+  end
+
+  def delete_task(task_id)
+    task_id = task_id.to_i
+    tasks = {}
+    @tasks.each do |_, task|
+      next if task_id == task.id
+
+      tasks[task.id] = task
+    end
+    @tasks = tasks
+    store_tasks
+  end
+
+  def print_all_tasks
+    @printer.print(@tasks)
+  end
+
+  def print_pending_tasks
+    tasks = {}
+    @tasks.each do |task_id, task|
+      next if task.completed?
+
+      tasks[task_id] = task
+    end
+    @printer.print(tasks)
+  end
+
+  def cleanup
+    @tasks = {}
+    store_tasks
+  end
+
+  private
+
+  def load_tasks
+    @tasks = {}
+    return unless File.exist?(STORAGE)
+
+    data = JSON.parse(File.read(STORAGE))
+    data.each do |key, val|
+      @tasks[key.to_i] = Task.new(id: key.to_i, task: val['task'], completed: val['completed'])
+    end
+  end
+
+  def store_tasks
+    data = {}
+    @tasks.each do |id, task|
+      data[id] = {
+        task: task.to_s,
+        completed: task.completed?
+      }
+    end
+    File.open(STORAGE, 'w') do |f|
+      f.write JSON.generate(data)
+    end
+  end
+end
+
+@task_manager = TaskManager.new(Printer.new($stdout))
+
+OptionParser.new do |opts|
+  opts.banner = 'Usage: todo [options] [task]'
+
+  opts.on('-c', '--complete TASK_ID', 'Complete task') do |task_id|
+    puts "Marking as completed task: #{task_id}"
+    @task_manager.complete_task(task_id)
+    exit
+  end
+
+  opts.on('-d', '--delete TASK_ID', 'Delete task') do |task_id|
+    puts "Deleting task: #{task_id}"
+    @task_manager.delete_task(task_id)
+    exit
+  end
+
+  opts.on('-a', '--all', 'Print all tasks') do
+    @task_manager.print_all_tasks
+    exit
+  end
+
+  opts.on('-k', '--cleanup', 'Drop everyting') do
+    @task_manager.cleanup
+    exit
+  end
+end.parse!
+
+if ARGV.count > 0
+  task = ARGV.join(" ")
+  puts "Inserting new task: #{task}"
+  @task_manager.add_task(task)
+else
+  @task_manager.print_pending_tasks
+end
