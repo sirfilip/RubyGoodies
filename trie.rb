@@ -1,72 +1,66 @@
 require 'minitest/autorun'
 
 class Trie
-  attr_reader :value
+  END_OF_WORD = :eow
 
-  def initialize(value = nil)
-    @value = value
-    @tries = {}
+  def initialize
+    @index = {}
   end
 
   def add(word)
-    if word == ''
-      @tries[:stop] = nil
-      return
-    end
+    h = @index
     chars = word.split('')
-    char = chars.shift
-    trie = if @tries.key?(char)
-        @tries[char]
+    chars.each do |char|
+      h = if h.key?(char)
+        h[char]
       else
-        @tries[char] = self.class.new(char)
-        @tries[char]
+        h[char] = {}
+        h[char]
       end
-    trie.add(chars.join(''))
+    end
+    h[END_OF_WORD] = nil
   end
 
   def lookup(word)
-    return @tries.key?(:stop) if word == ''
-
+    h = @index
     chars = word.split('')
-    char = chars.shift
-    if @tries.key?(char)
-      @tries[char].lookup(chars.join(''))
-    else
-      false
+    chars.each do |char|
+      h = h[char]
+      return false if h.nil?
     end
+    h.key?(END_OF_WORD)
   end
 
   def autocomplete(word, max_results: 5)
-    suggestions = []
-    return suggestions if max_results == 0
-
+    h = @index
     chars = word.split('')
-    char = chars.shift
-    if word != ''
-      return suggestions unless @tries[char]
-      @tries[char].autocomplete(chars.join(''), max_results: max_results).each do |completion|
-        suggestions << completion
-        return suggestions if suggestions.length == max_results
-      end
-    else
-      @tries.each do |char, trie|
-        if char == :stop
-          suggestions << value
-          max_results -= 1
-        else
-          trie.autocomplete('', max_results: max_results).each do |completion|
-            next if value.nil?
-            suggestions << value + completion
+    chars.each do |char|
+      h = h[char]
+      return [] if h.nil?
+    end
+    results = []
+    completions = {word => h}
+    while completions.any?
+      updated_completions = {}
+      completions.each do |prefix, index|
+        index.each do |char, index|
+          if char == END_OF_WORD
+            results << prefix
+            max_results -= 1
+            return results if max_results == 0
+            next
           end
+          updated_completions[prefix + char] = index
         end
+        completions = updated_completions
       end
     end
-    suggestions
+    results
   end
 end
 
 describe Trie do
-  dict = ['test', 'testing', 'a', 'atom', 'else', 'aa', 'ana', 'anas', 'anananas']
+  dict = ['test', 'test', 'test', 'testing', 'a', 'atom', 'else', 'aa', 'ana', 'anas', 'anananas', 'ab']
   {
     'test' => true,
     'testing' => true,
@@ -88,8 +82,8 @@ describe Trie do
 
   {
     't' => ['test', 'testing'],
-    'a' => ['a', 'atom', 'aa', 'ana', 'anas'],
-    '' => [],
+    'a' => ["a", "aa", "ab", "ana", "atom"],
+    '' => ["a", "aa", "ab", "ana", "test"],
     'bogus' => [],
   }.each do |term, want|
     it "autocompletes #{term}" do
