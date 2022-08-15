@@ -1,24 +1,35 @@
+#!/usr/bin/env ruby
+
 # frozen_string_literal: true
 
 require 'optparse'
 require 'json'
 
 class Task
-  attr_reader :id, :at
+  attr_reader :id, :at, :status
 
-  def initialize(id:, task:, completed:)
+  STATUS_PENDING = 'PENDING'
+  STATUS_IN_PROGRESS = 'IN PROGRESS'
+  STATUS_DONE = 'DONE'
+
+  def initialize(id:, task:, status:)
     @id = id
     @task = task
-    @completed = completed
+    @status = status
     @at = Time.at(id)
   end
 
   def completed?
-    @completed
+    @status == STATUS_DONE
   end
 
   def complete!
-    @completed = true
+    @status = STATUS_DONE
+    @at = Time.now
+  end
+
+  def start!
+    @status = STATUS_IN_PROGRESS
     @at = Time.now
   end
 
@@ -52,13 +63,15 @@ class Printer
   end
 
   def print_task(task)
-    @out.puts("|#{task.completed? ? 'DONE'.ljust(7) : 'PENDING'} | #{task.id} | #{task.to_s.ljust(longest_task_length + 5)} | #{task.at}|")
+    @out.puts("|#{task.status.ljust(11)} | #{task.id} | #{task.to_s.ljust(longest_task_length)} | #{task.at}|")
   end
 
   def longest_task_length
     @longest_task_length ||= @tasks.values.sort { |a, b| a.to_s.length <=> b.to_s.length }.last.to_s.length
   end
 end
+
+class RecordNotFoundError < StandardError; end
 
 class TaskManager
   STORAGE = ::File.join(ENV['HOME'], '.todos')
@@ -68,18 +81,23 @@ class TaskManager
     load_tasks
   end
 
-  def add_task(task)
+  def add(task)
     id = Time.now.to_i
     @tasks[id] = Task.new(id: id, task: task, completed: false)
     store_tasks
   end
 
-  def complete_task(task_id)
-    @tasks[task_id].complete!
+  def start(task_id)
+    find(task_id).start!
     store_tasks
   end
 
-  def delete_task(task_id)
+  def complete(task_id)
+    find(task_id).complete!
+    store_tasks
+  end
+
+  def delete(task_id)
     @tasks.delete(task_id)
     store_tasks
   end
@@ -99,13 +117,19 @@ class TaskManager
 
   private
 
+  def find(task_id)
+    @tasks.fetch(task_id)
+  rescue KeyError
+    raise RecordNotFoundError
+  end
+
   def load_tasks
     @tasks = {}
     return unless File.exist?(STORAGE)
 
     data = JSON.parse(File.read(STORAGE))
     data.each do |key, val|
-      @tasks[key.to_i] = Task.new(id: key.to_i, task: val['task'], completed: val['completed'])
+      @tasks[key.to_i] = Task.new(id: key.to_i, task: val['task'], status: val['status'])
     end
   end
 
@@ -114,7 +138,7 @@ class TaskManager
     @tasks.each do |id, task|
       data[id] = {
         task: task.to_s,
-        completed: task.completed?
+        status: task.status,
       }
     end
     File.open(STORAGE, 'w') do |f|
@@ -130,13 +154,17 @@ OptionParser.new do |opts|
 
   opts.on('-c', '--complete TASK_ID', Integer, 'Complete task') do |task_id|
     puts "Marking as completed task: #{task_id}"
-    @task_manager.complete_task(task_id)
+    begin
+      @task_manager.complete(task_id)
+    rescue RecordNotFoundError => _
+      puts "Task not found" 
+    end
     exit
   end
 
   opts.on('-d', '--delete TASK_ID', Integer, 'Delete task') do |task_id|
     puts "Deleting task: #{task_id}"
-    @task_manager.delete_task(task_id)
+    @task_manager.delete(task_id)
     exit
   end
 
@@ -149,12 +177,22 @@ OptionParser.new do |opts|
     @task_manager.cleanup
     exit
   end
+
+  opts.on('-s', '--start TASK_ID', Integer, 'Move task status in progress') do |task_id|
+    puts "Moving task in progress: #{task_id}"
+    begin
+      @task_manager.start(task_id)
+    rescue RecordNotFoundError => _
+      puts "Task not found" 
+    end
+    exit
+  end
 end.parse!
 
 if ARGV.count > 0
   task = ARGV.join(" ")
   puts "Inserting new task: #{task}"
-  @task_manager.add_task(task)
+  @task_manager.add(task)
 else
   @task_manager.print_pending_tasks
 end
