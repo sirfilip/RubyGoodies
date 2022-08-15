@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-
 # frozen_string_literal: true
 
 require 'optparse'
@@ -54,11 +52,11 @@ class Printer
   end
 
   def print_task(task)
-    @out.puts("|#{task.completed? ? 'DONE'.ljust(7) : 'PENDING'} | #{task.id} | #{task.to_s.ljust(longest_task_length)} | #{task.at}|")
+    @out.puts("|#{task.completed? ? 'DONE'.ljust(7) : 'PENDING'} | #{task.id} | #{task.to_s.ljust(longest_task_length + 5)} | #{task.at}|")
   end
 
   def longest_task_length
-    @longest_task_length ||= @tasks.values.sort { |a, b| a.to_s <=> b.to_s }.last.to_s.length
+    @longest_task_length ||= @tasks.values.sort { |a, b| a.to_s.length <=> b.to_s.length }.last.to_s.length
   end
 end
 
