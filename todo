@@ -33,6 +33,11 @@ class Task
     @at = Time.now
   end
 
+  def revert!
+    @status = STATUS_PENDING
+    @at = Time.now
+  end
+
   def to_s
     @task
   end
@@ -83,7 +88,7 @@ class TaskManager
 
   def add(task)
     id = Time.now.to_i
-    @tasks[id] = Task.new(id: id, task: task, completed: false)
+    @tasks[id] = Task.new(id: id, task: task, status: Task::STATUS_PENDING)
     store_tasks
   end
 
@@ -94,6 +99,11 @@ class TaskManager
 
   def complete(task_id)
     find(task_id).complete!
+    store_tasks
+  end
+
+  def revert(task_id)
+    find(task_id).revert!
     store_tasks
   end
 
@@ -152,6 +162,11 @@ end
 OptionParser.new do |opts|
   opts.banner = 'Usage: todo [options] [task]'
 
+  opts.on('-a', '--all', 'Print all tasks') do
+    @task_manager.print_all_tasks
+    exit
+  end
+
   opts.on('-c', '--complete TASK_ID', Integer, 'Complete task') do |task_id|
     puts "Marking as completed task: #{task_id}"
     begin
@@ -168,13 +183,18 @@ OptionParser.new do |opts|
     exit
   end
 
-  opts.on('-a', '--all', 'Print all tasks') do
-    @task_manager.print_all_tasks
+  opts.on('-k', '--cleanup', 'Drop everyting') do
+    @task_manager.cleanup
     exit
   end
 
-  opts.on('-k', '--cleanup', 'Drop everyting') do
-    @task_manager.cleanup
+  opts.on('-r', '--revert TASK_ID', Integer, 'Revert task') do |task_id|
+    puts "Reverting task: #{task_id}"
+    begin
+      @task_manager.revert(task_id)
+    rescue RecordNotFoundError => _
+      puts "Task not found" 
+    end
     exit
   end
 
