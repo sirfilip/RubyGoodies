@@ -116,6 +116,10 @@ class TaskManager
     @printer.print(@tasks)
   end
 
+  def query(q)
+    @printer.print(@tasks.reject{|_, task| task.to_s.scan(q).empty?})
+  end
+
   def print_pending_tasks
     @printer.print(@tasks.reject{|_, task| task.completed? })
   end
@@ -185,6 +189,11 @@ OptionParser.new do |opts|
 
   opts.on('-k', '--cleanup', 'Drop everyting') do
     @task_manager.cleanup
+    exit
+  end
+
+  opts.on('-q', '--query QUERY', String, 'Search in todo list') do |q|
+    @task_manager.query(q)
     exit
   end
 
