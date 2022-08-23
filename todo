@@ -11,6 +11,7 @@ class Task
   STATUS_PENDING = 'PENDING'
   STATUS_IN_PROGRESS = 'IN PROGRESS'
   STATUS_DONE = 'DONE'
+  STATUS_WONT_DO = 'WONT DO'
 
   def initialize(id:, task:, status:)
     @id = id
@@ -19,8 +20,8 @@ class Task
     @at = Time.at(id)
   end
 
-  def completed?
-    @status == STATUS_DONE
+  def pending?
+    @status == STATUS_PENDING
   end
 
   def complete!
@@ -35,6 +36,11 @@ class Task
 
   def revert!
     @status = STATUS_PENDING
+    @at = Time.now
+  end
+
+  def ignore!
+    @status = STATUS_WONT_DO
     @at = Time.now
   end
 
@@ -107,6 +113,11 @@ class TaskManager
     store_tasks
   end
 
+  def ignore(task_id)
+    find(task_id).ignore!
+    store_tasks
+  end
+
   def delete(task_id)
     @tasks.delete(task_id)
     store_tasks
@@ -121,7 +132,7 @@ class TaskManager
   end
 
   def print_pending_tasks
-    @printer.print(@tasks.reject{|_, task| task.completed? })
+    @printer.print(@tasks.filter{|_, task| task.pending? })
   end
 
   def cleanup
@@ -184,6 +195,12 @@ OptionParser.new do |opts|
   opts.on('-d', '--delete TASK_ID', Integer, 'Delete task') do |task_id|
     puts "Deleting task: #{task_id}"
     @task_manager.delete(task_id)
+    exit
+  end
+
+  opts.on('-i', '--ignore TASK_ID', Integer, 'Ignore task') do |task_id|
+    puts "Ignoring task: #{task_id}"
+    @task_manager.ignore(task_id)
     exit
   end
 
