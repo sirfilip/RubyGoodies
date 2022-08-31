@@ -20,8 +20,8 @@ class Task
     @at = Time.at(id)
   end
 
-  def pending?
-    @status == STATUS_PENDING
+  def unresolved?
+    @status == STATUS_PENDING || @status == STATUS_IN_PROGRESS
   end
 
   def complete!
@@ -123,7 +123,7 @@ class TaskManager
     store_tasks
   end
 
-  def print_all_tasks
+  def print_all
     @printer.print(@tasks)
   end
 
@@ -131,8 +131,8 @@ class TaskManager
     @printer.print(@tasks.reject{|_, task| task.to_s.scan(q).empty?})
   end
 
-  def print_pending_tasks
-    @printer.print(@tasks.filter{|_, task| task.pending? })
+  def print_unresolved
+    @printer.print(@tasks.filter{|_, task| task.unresolved? })
   end
 
   def cleanup
@@ -178,7 +178,7 @@ OptionParser.new do |opts|
   opts.banner = 'Usage: todo [options] [task]'
 
   opts.on('-a', '--all', 'Print all tasks') do
-    @task_manager.print_all_tasks
+    @task_manager.print_all
     exit
   end
 
@@ -240,5 +240,5 @@ if ARGV.count > 0
   puts "Inserting new task: #{task}"
   @task_manager.add(task)
 else
-  @task_manager.print_pending_tasks
+  @task_manager.print_unresolved
 end
