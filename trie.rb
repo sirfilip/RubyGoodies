@@ -1,97 +1,82 @@
-require 'minitest/autorun'
-
-class Trie
-  END_OF_WORD = :eow
+class TrieNode
+  attr_reader :children
 
   def initialize
-    @index = {}
+    @children = {}
+  end
+end
+
+
+class Trie
+  def initialize
+    @root = TrieNode.new
   end
 
-  def add(word)
-    h = @index
-    chars = word.split('')
-    chars.each do |char|
-      h = if h.key?(char)
-        h[char]
+  def search(word)
+    !index(word).nil?
+  end
+
+  def insert(word)
+    pointer = @root
+    word.split('').each do |char|
+      if pointer.children.key?(char)
+        pointer = pointer.children.fetch(char)
       else
-        h[char] = {}
-        h[char]
+        newNode = TrieNode.new
+        pointer.children[char] = newNode
+        pointer = newNode
       end
     end
-    h[END_OF_WORD] = nil
+    pointer.children["*"] = nil
   end
 
-  def lookup(word)
-    h = @index
-    chars = word.split('')
-    chars.each do |char|
-      h = h[char]
-      return false if h.nil?
+  def autocomplete(word="", node=nil, words=[])
+    pointer = node || if word == ""
+      @root
+    else
+      index(word)
     end
-    h.key?(END_OF_WORD)
-  end
+    return words if pointer.nil?
 
-  def autocomplete(word, max_results: 5)
-    h = @index
-    chars = word.split('')
-    chars.each do |char|
-      h = h[char]
-      return [] if h.nil?
-    end
-    results = []
-    completions = {word => h}
-    while completions.any?
-      updated_completions = {}
-      completions.each do |prefix, index|
-        index.each do |char, index|
-          if char == END_OF_WORD
-            results << prefix
-            max_results -= 1
-            return results if max_results == 0
-            next
-          end
-          updated_completions[prefix + char] = index
-        end
-        completions = updated_completions
+    pointer.children.each do |char, node|
+      if char == "*"
+        words << word
+      else
+        autocomplete(word + char, node, words)
       end
     end
-    results
+    words
+  end
+
+  private
+
+  def index(word)
+    pointer = @root
+
+    word.split('').each do |char|
+      if pointer.children.key?(char)
+        pointer = pointer.children.fetch(char)
+      else
+        return nil
+      end
+    end
+    return pointer
   end
 end
 
-describe Trie do
-  dict = ['test', 'test', 'test', 'testing', 'a', 'atom', 'else', 'aa', 'ana', 'anas', 'anananas', 'ab']
-  {
-    'test' => true,
-    'testing' => true,
-    'a' => true,
-    'aa' => true,
-    'atom' => true,
-    'else' => true,
-    '' => false,
-    'bogus' => false,
-  }.each do |word, want|
-    it "performs lookup for word: #{word}" do
-      trie = Trie.new
-      dict.each do |term|
-        trie.add(term)
-      end
-      assert_equal want, trie.lookup(word)
-    end
-  end
 
-  {
-    't' => ['test', 'testing'],
-    'a' => ["a", "aa", "ab", "ana", "atom"],
-    '' => ["a", "aa", "ab", "ana", "test"],
-    'bogus' => [],
-  }.each do |term, want|
-    it "autocompletes #{term}" do
-      trie = Trie.new
-      dict.each do |word|
-        trie.add(word)
-      end
-      assert_equal want, trie.autocomplete(term)
-    end
-  end
+def assert(cond)
+  raise "Assertion Failure" unless cond
 end
+
+trie = Trie.new
+trie.insert("cat")
+trie.insert("car")
+trie.insert("other")
+
+assert trie.search("cat")
+assert trie.search("car")
+assert !trie.search("card")
+assert trie.autocomplete("c") == ["cat", "car"]
+assert trie.autocomplete == ["cat", "car", "other"]
+assert trie.autocomplete("z") ==  []
